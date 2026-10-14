@@ -1,9 +1,12 @@
+import os
 import subprocess
 import time
 import urllib.request
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("deploy-mcp")
+
+ALLOWED_DIRS = [os.path.abspath("sample-app"), os.path.abspath("broken-app")]
 
 def run(cmd):
     p = subprocess.run(
@@ -21,9 +24,17 @@ def check_name(name):
     if not name.startswith("agent-"):
         raise ValueError("container name must start with 'agent-'")
 
+def check_path(path):
+    full = os.path.abspath(path)
+    for d in ALLOWED_DIRS:
+        if full == d or full.startswith(d + os.sep):
+            return full
+    raise ValueError("path not allowed: only sample-app and broken-app")
+
 @mcp.tool()
 def build_image(path: str, tag: str) -> str:
     """Build a Docker image from a folder that contains a Dockerfile."""
+    check_path(path)
     return run(["docker", "build", "-t", tag, path])
 
 @mcp.tool()
@@ -57,6 +68,21 @@ def health_check(url: str, retries: int = 5, delay: int = 2) -> str:
             last = str(e)
             time.sleep(delay)
     return f"FAIL after {retries} tries: {last}"
+
+@mcp.tool()
+def read_file(path: str) -> str:
+    """Read a text file inside sample-app or broken-app."""
+    full = check_path(path)
+    with open(full, "r", encoding="utf-8") as f:
+        return f.read()[:5000]
+
+@mcp.tool()
+def write_file(path: str, content: str) -> str:
+    """Overwrite a text file inside sample-app or broken-app."""
+    full = check_path(path)
+    with open(full, "w", encoding="utf-8") as f:
+        f.write(content)
+    return f"wrote {len(content)} chars to {path}"
 
 if __name__ == "__main__":
     mcp.run()

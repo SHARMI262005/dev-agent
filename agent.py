@@ -2,7 +2,7 @@ import asyncio, os, sys, time
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from google.genai.errors import ServerError
+from google.genai.errors import ServerError, ClientError
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -12,26 +12,34 @@ client = genai.Client(
     http_options=types.HttpOptions(timeout=60000),
 )
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-MAX_STEPS = 10
+MAX_STEPS = 20
 
 SYSTEM = """You are a DevOps agent. Use the tools to build, run, check and fix deployments.
 Rules:
 - Container names must start with 'agent-'.
 - Apps listen on port 8000 inside the container. Use host_port 8001.
 - After run_container, call health_check on http://localhost:8001/health.
-- If health_check fails, call get_logs, explain the cause, then fix or stop the container.
-- Never invent tool results. Give a short summary at the end."""
+- If health_check fails: call get_logs, explain the root cause, read the relevant files with read_file, fix them with write_file, stop the old container, rebuild with a NEW image tag, run again and re-check.
+- Make at most 2 fix attempts. If still failing, stop the container and report clearly.
+- Never claim success unless health_check returned 200 on /health.
+- Reply in English, short summary at the end."""
+
+MODELS = [MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash-lite"]
 
 def generate(contents, config):
-    for attempt in range(4):
-        try:
-            return client.models.generate_content(
-                model=MODEL, contents=contents, config=config
-            )
-        except ServerError:
-            print(f"  (model busy, retry {attempt + 1})")
-            time.sleep(5 * (attempt + 1))
-    raise RuntimeError("Model unavailable, try later")
+    for model in dict.fromkeys(MODELS):
+        for attempt in range(2):
+            try:
+                return client.models.generate_content(
+                    model=model, contents=contents, config=config
+                )
+            except ServerError:
+                print(f"  ({model} busy, retry {attempt + 1})")
+                time.sleep(4)
+            except ClientError as e:
+                print(f"  ({model} error {e.code}, trying next model)")
+                break
+    raise RuntimeError("All models unavailable, try again in a few minutes")
 
 async def main():
     params = StdioServerParameters(command=sys.executable, args=["deploy_server.py"])
