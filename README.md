@@ -153,10 +153,7 @@ Try these prompts:
 ## Project files
 
 
-
-`deploy_server.py` (MCP server), `agent_core.py` (agent loop), `app.py` (UI), `agent.py` (CLI version).
-
-
+`deploy_server.py` (MCP server), `agent_core.py` (agent loop), `app.py` (UI), `agent.py` (CLI version), `test_mcp.py` (MCP smoke test), `setup_sample.py` and `setup_broken.py` (demo apps).
 
 ## License
 
