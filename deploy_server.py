@@ -1,4 +1,5 @@
 import subprocess
+import time
 import urllib.request
 from mcp.server.fastmcp import FastMCP
 
@@ -44,14 +45,18 @@ def stop_container(name: str) -> str:
     return run(["docker", "rm", "-f", name])
 
 @mcp.tool()
-def health_check(url: str) -> str:
-    """HTTP GET a URL and report the status."""
-    try:
-        with urllib.request.urlopen(url, timeout=5) as r:
-            body = r.read().decode("utf-8", errors="replace")[:200]
-            return f"{r.status} {body}"
-    except Exception as e:
-        return f"FAIL: {e}"
+def health_check(url: str, retries: int = 5, delay: int = 2) -> str:
+    """HTTP GET a URL, retrying while the app starts. Reports the final status."""
+    last = ""
+    for _ in range(retries):
+        try:
+            with urllib.request.urlopen(url, timeout=5) as r:
+                body = r.read().decode("utf-8", errors="replace")[:200]
+                return f"{r.status} {body}"
+        except Exception as e:
+            last = str(e)
+            time.sleep(delay)
+    return f"FAIL after {retries} tries: {last}"
 
 if __name__ == "__main__":
     mcp.run()
