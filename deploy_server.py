@@ -1,4 +1,5 @@
 import os
+import json
 import subprocess
 import time
 import urllib.request
@@ -41,7 +42,9 @@ def build_image(path: str, tag: str) -> str:
 def run_container(image: str, host_port: int, name: str) -> str:
     """Run a container in the background. App must listen on port 8000 inside."""
     check_name(name)
-    return run(["docker", "run", "-d", "-p", f"{host_port}:8000", "--name", name, image])
+    out = run(["docker", "run", "-d", "-p", f"{host_port}:8000", "--name", name, image])
+    record_deploy(name, image, host_port)
+    return out
 
 @mcp.tool()
 def get_logs(name: str) -> str:
@@ -83,6 +86,49 @@ def write_file(path: str, content: str) -> str:
     with open(full, "w", encoding="utf-8") as f:
         f.write(content)
     return f"wrote {len(content)} chars to {path}"
+
+
+HISTORY_FILE = "deployments.json"
+
+def load_history():
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def record_deploy(name, image, host_port):
+    h = load_history()
+    h.append({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "name": name, "image": image, "host_port": host_port})
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(h[-50:], f, indent=2)
+
+@mcp.tool()
+def deployment_history(name: str) -> str:
+    """Show the recent deployments (image, port, time) for a container name."""
+    check_name(name)
+    rows = [r for r in load_history() if r["name"] == name]
+    return json.dumps(rows[-5:], indent=2) if rows else "no history"
+
+@mcp.tool()
+def rollback(name: str) -> str:
+    """Roll back a container to the previous different image deployed under this name."""
+    check_name(name)
+    rows = [r for r in load_history() if r["name"] == name]
+    if len(rows) < 2:
+        return "no previous deployment to roll back to"
+    current = rows[-1]
+    previous = None
+    for r in reversed(rows[:-1]):
+        if r["image"] != current["image"]:
+            previous = r
+            break
+    if not previous:
+        return "no different previous image found"
+    run(["docker", "rm", "-f", name])
+    out = run(["docker", "run", "-d", "-p", f"{previous['host_port']}:8000", "--name", name, previous["image"]])
+    record_deploy(name, previous["image"], previous["host_port"])
+    return f"rolled back to {previous['image']}: {out}"
 
 if __name__ == "__main__":
     mcp.run()

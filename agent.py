@@ -14,7 +14,7 @@ client = genai.Client(
 )
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 MAX_STEPS = 20
-NEEDS_APPROVAL = {"write_file", "stop_container"}
+NEEDS_APPROVAL = {"write_file", "stop_container", "rollback"}
 AUDIT_FILE = "audit.jsonl"
 
 SYSTEM = """You are a DevOps agent. Use the tools to build, run, check and fix deployments.
@@ -25,6 +25,9 @@ Rules:
 - If health_check fails or the container exits: ALWAYS call get_logs first and explain the root cause. Then read the relevant files with read_file, fix them with write_file, stop the old container, rebuild with a NEW image tag, run again and re-check.
 - Make at most 2 fix attempts. If still failing, stop the container and report clearly.
 - If a tool returns DENIED_BY_HUMAN, do not retry it. Stop and report what was denied.
+- If get_logs is empty, say so, and state which tool output (for example the run_container error) the root cause came from.
+- After a human denies an action, do NOT try other edits to work around it. Stop and report.
+- If the user asks to roll back: call deployment_history, then rollback, then health_check.
 - Never claim success unless health_check returned 200 on /health.
 - Reply in English, short summary at the end."""
 
@@ -78,7 +81,10 @@ async def main():
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             )
 
-            user_msg = input("You: ")
+            user_msg = input("You: ").strip()
+            if not user_msg:
+                print("Empty request, exiting.")
+                return
             audit("user_request", text=user_msg)
             contents = [types.Content(role="user", parts=[types.Part(text=user_msg)])]
 
