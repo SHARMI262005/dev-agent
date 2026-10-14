@@ -2,3 +2,5 @@
 venv/
 audit.jsonl
 deployments.json
+__pycache__/
+*.pyc
