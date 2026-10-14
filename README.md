@@ -1,4 +1,4 @@
-\# Deployer: AI DevOps Agent (Gemini + MCP + Docker)
+# Deployer: AI DevOps Agent (Gemini + MCP + Docker)
 
 
 
@@ -10,7 +10,7 @@ Chat-la sonna pothum, an LLM agent decides which tools to call and deploys your 
 
 
 
-\## Architecture
+## Architecture
 
 
 
@@ -18,25 +18,25 @@ Chat-la sonna pothum, an LLM agent decides which tools to call and deploys your 
 
 flowchart LR
 
-&#x20;   UI\[Streamlit chat UI] --> A\[Agent loop<br/>Gemini function calling]
+    UI[Streamlit chat UI] --> A[Agent loop<br/>Gemini function calling]
 
-&#x20;   A -->|MCP over stdio| M\[deploy-mcp server<br/>Python MCP SDK]
+    A -->|MCP over stdio| M[deploy-mcp server<br/>Python MCP SDK]
 
-&#x20;   M --> D\[Docker]
+    M --> D[Docker]
 
-&#x20;   A --> G{Approval gate}
+    A --> G{Approval gate}
 
-&#x20;   G -->|approved| M
+    G -->|approved| M
 
-&#x20;   A --> L\[(audit.jsonl)]
+    A --> L[(audit.jsonl)]
 
-&#x20;   M --> H\[(deployments.json)]
+    M --> H[(deployments.json)]
 
 ```
 
 
 
-\## MCP tools (deploy\_server.py)
+## MCP tools (deploy_server.py)
 
 
 
@@ -44,39 +44,39 @@ flowchart LR
 
 |---|---|
 
-| `build\_image` | Build a Docker image from an allowed folder |
+| `build_image` | Build a Docker image from an allowed folder |
 
-| `run\_container` | Run a container (host port to 8000) |
+| `run_container` | Run a container (host port to 8000) |
 
-| `get\_logs` | Last 50 log lines |
+| `get_logs` | Last 50 log lines |
 
-| `health\_check` | HTTP check with retries |
+| `health_check` | HTTP check with retries |
 
-| `read\_file` / `write\_file` | Inspect and fix files in allowed folders |
+| `read_file` / `write_file` | Inspect and fix files in allowed folders |
 
-| `stop\_container` | Stop and remove a container |
+| `stop_container` | Stop and remove a container |
 
-| `deployment\_history` / `rollback` | Roll back to the previous different image |
-
-
-
-\## Safety design
+| `deployment_history` / `rollback` | Roll back to the previous different image |
 
 
 
-\- \*\*Human approval gate in code\*\*: `write\_file`, `stop\_container` and `rollback` need an explicit Approve in the UI. When I rejected a `requirements.txt` edit, the agent tried to edit the `Dockerfile` instead; the gate blocked that too. A prompt rule alone would not have stopped it.
-
-\- \*\*Name guard\*\*: containers must start with `agent-`, so the agent cannot touch your other containers.
-
-\- \*\*Path allow-list\*\*: file tools only work inside `sample-app` and `broken-app`.
-
-\- \*\*Audit log\*\*: every request, tool call, denial and summary goes to `audit.jsonl`.
-
-\- \*\*Step limit\*\*: the loop stops after 20 steps (enforced in code). The "max 2 fix attempts" rule is a prompt instruction, not a code limit.
+## Safety design
 
 
 
-\## Run it
+- **Human approval gate in code**: `write_file`, `stop_container` and `rollback` need an explicit Approve in the UI. When I rejected a `requirements.txt` edit, the agent tried to edit the `Dockerfile` instead; the gate blocked that too. A prompt rule alone would not have stopped it.
+
+- **Name guard**: containers must start with `agent-`, so the agent cannot touch your other containers.
+
+- **Path allow-list**: file tools only work inside `sample-app` and `broken-app`.
+
+- **Audit log**: every request, tool call, denial and summary goes to `audit.jsonl`.
+
+- **Step limit**: the loop stops after 20 steps (enforced in code). The "max 2 fix attempts" rule is a prompt instruction, not a code limit.
+
+
+
+## Run it
 
 
 
@@ -88,9 +88,9 @@ Requirements: Python 3.11+, Docker Desktop, a Gemini API key.
 
 python -m venv venv
 
-venv\\Scripts\\activate
+venv\Scripts\activate
 
-pip install "mcp\[cli]<2" google-genai python-dotenv streamlit
+pip install "mcp[cli]<2" google-genai python-dotenv streamlit
 
 ```
 
@@ -102,9 +102,9 @@ Create `.env`:
 
 ```
 
-GEMINI\_API\_KEY=your-key
+GEMINI_API_KEY=your-key
 
-GEMINI\_MODEL=gemini-3.8-flash
+GEMINI_MODEL=gemini-3.8-flash
 
 ```
 
@@ -116,9 +116,9 @@ Create the demo apps and start the UI:
 
 ```bash
 
-python setup\_sample.py
+python setup_sample.py
 
-python setup\_broken.py
+python setup_broken.py
 
 streamlit run app.py
 
@@ -138,27 +138,27 @@ Try these prompts:
 
 
 
-\## Known limitations
+## Known limitations
 
 
 
-\- Local Docker only; no cloud deploy yet.
+- Local Docker only; no cloud deploy yet.
 
-\- Free-tier Gemini returns 503 often, so the agent falls back through several models.
+- Free-tier Gemini returns 503 often, so the agent falls back through several models.
 
-\- The agent's explanation can still be wrong; the health check result is the source of truth.
-
-
-
-\## Project files
+- The agent's explanation can still be wrong; the health check result is the source of truth.
 
 
 
-`deploy\_server.py` (MCP server), `agent\_core.py` (agent loop), `app.py` (UI), `agent.py` (CLI version).
+## Project files
 
 
 
-\## License
+`deploy_server.py` (MCP server), `agent_core.py` (agent loop), `app.py` (UI), `agent.py` (CLI version).
+
+
+
+## License
 
 
 
